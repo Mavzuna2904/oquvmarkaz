@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O'quv markazi — to'lov monitoringi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700&display=swap">
+<style>
+:root{--ink:#1f2a44;--bg:#f3f6fa;--card:#fff;--line:#d9e0ea;--mute:#5d6b82;--debt:#c8372d;--ok:#2f7d5b;--warn:#b7791f}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 Onest,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--ink);color:#fff;padding:18px 20px 0}
+h1{font-size:20px;margin:0 0 12px;font-weight:700}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav button{background:none;border:0;color:#b9c4d9;padding:10px 16px;font:inherit;cursor:pointer;border-radius:8px 8px 0 0}
+nav button[aria-selected=true]{background:var(--bg);color:var(--ink);font-weight:700}
+nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #3b6fe0;outline-offset:2px}
+main{max-width:980px;margin:0 auto;padding:20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.stat b{display:block;font-size:24px}.stat span{color:var(--mute);font-size:14px}
+.stat.red{border-color:var(--debt)}.stat.red b{color:var(--debt)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:20px;overflow-x:auto}
+h2{font-size:17px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:500;font-size:14px}
+td.num,th.num{text-align:right}
+.debt{color:var(--debt);font-weight:700}.ok{color:var(--ok)}
+.tag{padding:2px 9px;border-radius:99px;font-size:13px;background:#e6f2ec;color:var(--ok)}
+.tag.bad{background:#fbe9e7;color:var(--debt)}.tag.off{background:#eceff4;color:var(--mute)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end}
+label{display:grid;gap:4px;font-size:14px;color:var(--mute)}
+input,select{font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:#fff}
+.btn{font:inherit;background:var(--ink);color:#fff;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+.btn.sm{padding:5px 10px;font-size:14px;background:#eceff4;color:var(--ink)}
+.empty{color:var(--mute);padding:8px 0}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+.banner{background:#fff4d6;color:#7a5a10;padding:8px 20px;font-size:14px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>O'quv markazi — to'lov monitoringi</h1>
+  <nav role="tablist" id="tabs">
+    <button data-t="dash" aria-selected="true">Qarzdorlar</button>
+    <button data-t="stu">O'quvchilar</button>
+    <button data-t="pay">To'lov qabul qilish</button>
+    <button data-t="att">Davomat</button>
+  </nav>
+</header>
+<div class="banner" id="demo" hidden>Demo rejim: ma'lumotlar shu brauzerda saqlanadi. Haqiqiy bazaga ulash uchun API_URL ni kiriting.</div>
+<main>
+  <section id="dash">
+    <div class="stats" id="stats"></div>
+    <div class="panel"><h2>Qarzdor o'quvchilar</h2><div id="debtors"></div></div>
+  </section>
+
+  <section id="stu" hidden>
+    <div class="panel"><h2>Yangi o'quvchi</h2>
+      <form id="fStu">
+        <label>Ism familiya<input name="ism" required></label>
+        <label>Telefon<input name="tel" type="tel" placeholder="+998 90 123 45 67" required></label>
+        <label>Guruh<input name="guruh" placeholder="Ingliz tili A1" required></label>
+        <label>Oylik to'lov (so'm)<input name="narx" type="number" min="0" step="1000" required></label>
+        <label>Boshlagan sana<input name="boshlandi" type="date" required></label>
+        <button class="btn">Qo'shish</button>
+      </form></div>
+    <div class="panel"><h2>Ro'yxat</h2><div id="stuList"></div></div>
+  </section>
+
+  <section id="pay" hidden>
+    <div class="panel"><h2>To'lov qabul qilish</h2>
+      <form id="fPay">
+        <label>O'quvchi<select name="studentId" id="paySel" required></select></label>
+        <label>Summa (so'm)<input name="summa" type="number" min="1000" step="1000" required></label>
+        <label>Sana<input name="sana" type="date" required></label>
+        <button class="btn">Saqlash</button>
+      </form></div>
+    <div class="panel"><h2>Oxirgi to'lovlar</h2><div id="payList"></div></div>
+  </section>
+
+  <section id="att" hidden>
+    <div class="panel"><h2>Kunlik davomat</h2>
+      <label style="max-width:200px;margin-bottom:12px">Sana<input type="date" id="attDate"></label>
+      <div id="attList"></div>
+      <p><button class="btn" id="attSave">Davomatni saqlash</button></p></div>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+// Apps Script Web App URL'i. Bo'sh bo'lsa — demo rejim (localStorage).
+const API_URL = "https://script.google.com/macros/s/AKfycbxqRIiC2gHff5AuAO5MbVXaWe9i6WQLa63vOUHmHzp5I85RXTTLJbt3YysD5n5k06HC/exec";
+
+const $ = s => document.querySelector(s);
+const today = () => new Date().toISOString().slice(0, 10);
+const money = n => Math.round(n).toLocaleString("ru-RU") + " so'm";
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+let DB = { students: [], payments: [], attendance: [] };
+
+/* ---------- Ma'lumotlar qatlami ---------- */
+function apply(a, d) {
+  if (a === "addStudent") DB.students.push({ id: uid(), holat: "faol", ...d });
+  if (a === "addPayment") DB.payments.push({ id: uid(), ...d });
+  if (a === "setStatus") DB.students.find(s => s.id === d.id).holat = d.holat;
+  if (a === "saveAttendance") {
+    DB.attendance = DB.attendance.filter(r => r.sana !== d.sana)
+      .concat(d.records.map(r => ({ sana: d.sana, ...r })));
+  }
+}
+async function load() {
+  if (API_URL) DB = await (await fetch(API_URL + "?action=list")).json();
+  else DB = JSON.parse(localStorage.getItem("oquv-db") || "null") || seed();
+  $("#demo").hidden = !!API_URL;
+  render();
+}
+async function send(action, data) {
+  if (API_URL) {
+    const r = await (await fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action, data }) })).json();
+    if (!r.ok) return toast("Xatolik: " + r.error);
+    await load();
+  } else { apply(action, data); localStorage.setItem("oquv-db", JSON.stringify(DB)); render(); }
+  toast("Saqlandi");
+}
+function seed() {
+  const m = k => { const d = new Date(); d.setMonth(d.getMonth() - k); d.setDate(5); return d.toISOString().slice(0, 10); };
+  const S = [["Aziza Karimova","+998901112233","Ingliz tili A1",400000,2],["Jasur Rahimov","+998935556677","Matematika",350000,3],
+    ["Malika Yusupova","+998977778899","Ingliz tili A1",400000,1],["Bekzod Tursunov","+998911234567","IT asoslari",500000,2],["Dilnoza Ergasheva","+998909998877","Matematika",350000,0]];
+  const db = { students: [], payments: [], attendance: [] };
+  S.forEach(([ism, tel, guruh, narx, k], i) => db.students.push({ id: "s" + i, ism, tel, guruh, narx, boshlandi: m(k), holat: "faol" }));
+  db.payments.push({ id: "p1", studentId: "s0", sana: m(2), summa: 400000 }, { id: "p2", studentId: "s0", sana: m(1), summa: 400000 },
+    { id: "p3", studentId: "s0", sana: m(0), summa: 400000 }, { id: "p4", studentId: "s1", sana: m(3), summa: 700000 },
+    { id: "p5", studentId: "s2", sana: m(1), summa: 400000 }, { id: "p6", studentId: "s2", sana: m(0), summa: 400000 },
+    { id: "p7", studentId: "s3", sana: m(2), summa: 500000 }, { id: "p8", studentId: "s4", sana: m(0), summa: 350000 });
+  [0, 1, 2].forEach(k => { const d = new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
+    db.students.forEach((s, i) => db.attendance.push({ sana: d, studentId: s.id, keldi: (i + k) % 4 !== 0 })); });
+  return db;
+}
+
+/* ---------- Biznes mantiq ---------- */
+function calc(s) {
+  const a = new Date(s.boshlandi), n = new Date();
+  const months = Math.max(1, (n.getFullYear() - a.getFullYear()) * 12 + n.getMonth() - a.getMonth() + 1);
+  const due = months * Number(s.narx);
+  const paid = DB.payments.filter(p => p.studentId === s.id).reduce((t, p) => t + Number(p.summa), 0);
+  const att = DB.attendance.filter(r => r.studentId === s.id);
+  const came = att.filter(r => r.keldi === true || r.keldi === "TRUE").length;
+  return { due, paid, debt: Math.max(0, due - paid), months, rate: att.length ? Math.round(came / att.length * 100) : null };
+}
+const name = id => (DB.students.find(s => s.id === id) || { ism: "?" }).ism;
+
+/* ---------- Ko'rinish ---------- */
+function render() {
+  const act = DB.students.filter(s => s.holat === "faol");
+  const rows = act.map(s => ({ s, ...calc(s) }));
+  const debtors = rows.filter(r => r.debt > 0).sort((a, b) => b.debt - a.debt);
+  const ym = today().slice(0, 7);
+  const income = DB.payments.filter(p => String(p.sana).startsWith(ym)).reduce((t, p) => t + Number(p.summa), 0);
+
+  $("#stats").innerHTML = `
+    <div class="stat"><b>${act.length}</b><span>Faol o'quvchi</span></div>
+    <div class="stat"><b>${money(income)}</b><span>Shu oy tushum</span></div>
+    <div class="stat red"><b>${debtors.length}</b><span>Qarzdor o'quvchi</span></div>
+    <div class="stat red"><b>${money(debtors.reduce((t, r) => t + r.debt, 0))}</b><span>Jami qarz</span></div>`;
+
+  $("#debtors").innerHTML = debtors.length ? `<table><tr><th>O'quvchi</th><th>Guruh</th><th>Telefon</th><th class="num">Hisoblangan</th><th class="num">To'langan</th><th class="num">Qarz</th></tr>` +
+    debtors.map(r => `<tr><td>${esc(r.s.ism)}</td><td>${esc(r.s.guruh)}</td><td><a href="tel:${esc(r.s.tel)}">${esc(r.s.tel)}</a></td>
+      <td class="num">${money(r.due)}</td><td class="num">${money(r.paid)}</td><td class="num debt">${money(r.debt)}</td></tr>`).join("") + "</table>"
+    : `<p class="empty">Qarzdor yo'q — barcha to'lovlar o'z vaqtida.</p>`;
+
+  $("#stuList").innerHTML = DB.students.length ? `<table><tr><th>Ism</th><th>Telefon</th><th>Guruh</th><th>Holat</th><th class="num">Davomat</th><th>To'lov</th><th></th></tr>` +
+    DB.students.map(s => { const c = calc(s);
+      return `<tr><td>${esc(s.ism)}</td><td>${esc(s.tel)}</td><td>${esc(s.guruh)}</td>
+      <td><span class="tag ${s.holat === "faol" ? "" : "off"}">${esc(s.holat)}</span></td>
+      <td class="num">${c.rate === null ? "—" : c.rate + "%"}</td>
+      <td>${c.debt > 0 ? `<span class="tag bad">Qarz ${money(c.debt)}</span>` : `<span class="tag">To'langan</span>`}</td>
+      <td><button class="btn sm" data-toggle="${s.id}">${s.holat === "faol" ? "Nofaol qilish" : "Faollashtirish"}</button></td></tr>`; }).join("") + "</table>"
+    : `<p class="empty">Hali o'quvchi yo'q. Yuqoridagi shakl orqali qo'shing.</p>`;
+
+  $("#paySel").innerHTML = act.map(s => `<option value="${s.id}">${esc(s.ism)} — ${esc(s.guruh)}</option>`).join("");
+  const last = [...DB.payments].sort((a, b) => String(b.sana).localeCompare(String(a.sana))).slice(0, 8);
+  $("#payList").innerHTML = last.length ? `<table><tr><th>Sana</th><th>O'quvchi</th><th class="num">Summa</th></tr>` +
+    last.map(p => `<tr><td>${esc(p.sana)}</td><td>${esc(name(p.studentId))}</td><td class="num ok">${money(p.summa)}</td></tr>`).join("") + "</table>"
+    : `<p class="empty">To'lovlar hali yo'q.</p>`;
+  renderAtt();
+}
+function renderAtt() {
+  const d = $("#attDate").value, act = DB.students.filter(s => s.holat === "faol");
+  const was = id => { const r = DB.attendance.find(r => r.sana === d && r.studentId === id); return r ? (r.keldi === true || r.keldi === "TRUE") : true; };
+  $("#attList").innerHTML = act.length ? `<table><tr><th>O'quvchi</th><th>Guruh</th><th>Keldi</th></tr>` +
+    act.map(s => `<tr><td>${esc(s.ism)}</td><td>${esc(s.guruh)}</td><td><input type="checkbox" data-att="${s.id}" ${was(s.id) ? "checked" : ""} aria-label="${esc(s.ism)} keldi"></td></tr>`).join("") + "</table>"
+    : `<p class="empty">Faol o'quvchi yo'q.</p>`;
+}
+function toast(t) { const e = $("#toast"); e.textContent = t; e.classList.add("on"); setTimeout(() => e.classList.remove("on"), 1800); }
+
+/* ---------- Hodisalar ---------- */
+$("#tabs").onclick = e => { const t = e.target.dataset.t; if (!t) return;
+  document.querySelectorAll("main section").forEach(s => s.hidden = s.id !== t);
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t)); };
+$("#fStu").onsubmit = e => { e.preventDefault(); send("addStudent", Object.fromEntries(new FormData(e.target))); e.target.reset(); };
+$("#fPay").onsubmit = e => { e.preventDefault(); send("addPayment", Object.fromEntries(new FormData(e.target))); e.target.summa.value = ""; };
+$("#stuList").onclick = e => { const id = e.target.dataset.toggle; if (!id) return;
+  const s = DB.students.find(s => s.id === id); send("setStatus", { id, holat: s.holat === "faol" ? "nofaol" : "faol" }); };
+$("#attDate").onchange = renderAtt;
+$("#attSave").onclick = () => send("saveAttendance", { sana: $("#attDate").value,
+  records: [...document.querySelectorAll("[data-att]")].map(c => ({ studentId: c.dataset.att, keldi: c.checked })) });
+
+$("#attDate").value = today();
+document.querySelector("#fPay [name=sana]").value = today();
+load().catch(() => toast("Serverga ulanib bo'lmadi"));
+</script>
+</body>
+</html>
